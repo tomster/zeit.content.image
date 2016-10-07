@@ -1,3 +1,4 @@
+from math import ceil
 from zeit.cms.i18n import MessageFactory as _
 from zeit.content.image.interfaces import IMAGE_NAMESPACE, VIEWPORT_SOURCE
 import PIL.ImageColor
@@ -113,9 +114,10 @@ class ImageGroupBase(object):
         size = self.get_variant_size(key)
         fill = self.get_variant_fill(key)
         viewport = self.get_variant_viewport(key)
+        ratio = self.get_ratio(key)
 
         # Make sure no invalid or redundant modifiers were provided
-        values = [variant.name, size, fill, viewport]
+        values = [variant.name, size, fill, viewport, ratio]
         if len([x for x in values if x]) != len(key.split('__')):
             raise KeyError(key)
 
@@ -151,6 +153,9 @@ class ImageGroupBase(object):
                 size = variant.legacy_size
             elif variant.max_width < sys.maxint > variant.max_height:
                 size = [variant.max_width, variant.max_height]
+
+        if ratio and size and (0.5 <= ratio <= 3.0):
+            size = [int(ceil(x * ratio)) for x in size]
 
         # Be defensive about missing meta files, so source could not be
         # recognized as an image (for zeit.web)
@@ -191,6 +196,17 @@ class ImageGroupBase(object):
 
     def get_variant_viewport(self, key):
         return get_viewport_from_key(key)
+
+    def get_ratio(self, key):
+        """If key contains `2x`, retrieve ratio 2 else 1"""
+        for segment in key.split('__')[1:]:
+            seg = segment.split('x')
+            if len(seg) is 2 and not seg[1]:
+                try:
+                    return float(seg[0])
+                except ValueError:
+                    continue
+        return None
 
     def get_variant_by_key(self, key):
         """Retrieve Variant by using as much information as given in key."""
